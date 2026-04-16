@@ -26,10 +26,15 @@ export class DemandTypeController {
   constructor(private readonly demandTypeService: DemandTypeService) {}
 
   @Get()
-  @ApiOperation({ summary: 'Get all demand types' })
+  @ApiOperation({
+    summary: 'Get all demand types',
+    description:
+      'Returns all configured demand types ordered by priority. ' +
+      'Each demand type maps a channel + order-type combination to an allocation template.',
+  })
   @ApiResponse({
     status: 200,
-    description: 'List of all demand types',
+    description: 'Ordered list of all demand types',
     type: [Object],
   })
   async findAll(): Promise<DemandType[]> {
@@ -37,12 +42,18 @@ export class DemandTypeController {
   }
 
   @Post()
-  @ApiOperation({ summary: 'Create a new demand type' })
+  @ApiOperation({
+    summary: 'Create a new demand type',
+    description:
+      'Registers a new demand type. The engine uses demand types to determine which ' +
+      'allocation template to apply for incoming orders. Priority is implied by insertion order.',
+  })
   @ApiResponse({
     status: 201,
     description: 'Demand type created successfully',
     type: Object,
   })
+  @ApiResponse({ status: 400, description: 'Validation failed — check required fields and formats' })
   async create(
     @Body() createDemandTypeDto: CreateDemandTypeDto,
   ): Promise<DemandType> {
@@ -50,13 +61,19 @@ export class DemandTypeController {
   }
 
   @Put(':id')
-  @ApiOperation({ summary: 'Update a demand type' })
-  @ApiParam({ name: 'id', description: 'Demand type ID' })
+  @ApiOperation({
+    summary: 'Update a demand type',
+    description:
+      'Partially updates an existing demand type. Only provided fields are changed. ' +
+      'Changing the allocationTemplate will affect future allocation runs.',
+  })
+  @ApiParam({ name: 'id', description: 'Demand type ID', example: 'dt-1-retail' })
   @ApiResponse({
     status: 200,
     description: 'Demand type updated successfully',
     type: Object,
   })
+  @ApiResponse({ status: 400, description: 'Validation failed — check field formats' })
   @ApiResponse({ status: 404, description: 'Demand type not found' })
   async update(
     @Param('id') id: string,
@@ -71,8 +88,13 @@ export class DemandTypeController {
 
   @Delete(':id')
   @HttpCode(204)
-  @ApiOperation({ summary: 'Delete a demand type' })
-  @ApiParam({ name: 'id', description: 'Demand type ID' })
+  @ApiOperation({
+    summary: 'Delete a demand type',
+    description:
+      'Permanently removes a demand type. Orders matching this demand type will no longer ' +
+      'be assigned a template during allocation runs.',
+  })
+  @ApiParam({ name: 'id', description: 'Demand type ID', example: 'dt-1-retail' })
   @ApiResponse({ status: 204, description: 'Demand type deleted successfully' })
   @ApiResponse({ status: 404, description: 'Demand type not found' })
   async remove(@Param('id') id: string): Promise<void> {
