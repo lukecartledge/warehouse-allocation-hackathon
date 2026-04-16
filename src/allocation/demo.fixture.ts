@@ -9,15 +9,31 @@ import {
 const DEMO_WAREHOUSE_ID = 'WH-ZURICH';
 
 export const demoInventory: InventoryPoolDto[] = [
+  // On-hand Inventory (primary source)
   {
     skuId: 'SKU-RUNNER-001',
     warehouseId: DEMO_WAREHOUSE_ID,
-    availableToSell: 50,
+    availableToSell: 35,
+    source: 'On-hand Inventory',
   },
   {
     skuId: 'SKU-JACKET-002',
     warehouseId: DEMO_WAREHOUSE_ID,
-    availableToSell: 30,
+    availableToSell: 20,
+    source: 'On-hand Inventory',
+  },
+  // Transfer Orders (secondary source — fallthrough)
+  {
+    skuId: 'SKU-RUNNER-001',
+    warehouseId: DEMO_WAREHOUSE_ID,
+    availableToSell: 15,
+    source: 'Transfer Orders',
+  },
+  {
+    skuId: 'SKU-JACKET-002',
+    warehouseId: DEMO_WAREHOUSE_ID,
+    availableToSell: 10,
+    source: 'Transfer Orders',
   },
 ];
 
