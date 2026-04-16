@@ -88,9 +88,22 @@ export class AllocationEngineService {
           status = 'unallocated';
         }
 
-        atsByPoolKey.set(poolKey, availableBeforeAllocation - allocatedQty);
-
         const template = templatesByDemandType.get(order.demandType);
+
+        // Clearance drop-out: if template uses drop-out mode and order
+        // can't be fully filled, reject the entire allocation.
+        let reason: string | undefined;
+        if (
+          status !== 'allocated' &&
+          template?.clearanceLogic === true &&
+          template.clearanceMode === 'drop-out'
+        ) {
+          allocatedQty = 0;
+          status = 'unallocated';
+          reason = 'Dropped: clearance drop-out mode, insufficient supply';
+        }
+
+        atsByPoolKey.set(poolKey, availableBeforeAllocation - allocatedQty);
 
         results.push({
           id: `res-${order.orderId}-${order.skuId}`,
@@ -102,7 +115,7 @@ export class AllocationEngineService {
           allocatedQty,
           status,
           source,
-          reason: this.buildReasonCode({
+          reason: reason ?? this.buildReasonCode({
             status,
             order,
             priorityRank,
