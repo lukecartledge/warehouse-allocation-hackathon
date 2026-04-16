@@ -69,10 +69,17 @@ export class AllocationService {
         skuId: pool.skuId,
         warehouseId: pool.warehouseId,
         availableToSell: pool.availableToSell,
+        source: pool.source,
       })),
       request.supplyOverrides,
     );
-    const results = await this.engine.allocate(filteredOrders, inventory, activePreset);
+    const supplyConfig = await this.supplyService.getConfig();
+    const results = await this.engine.allocate(
+      filteredOrders,
+      inventory,
+      activePreset,
+      supplyConfig.sequence,
+    );
     const summary = this.buildSummary(results);
     const runId = randomUUID();
     const dryRun = request.dryRun ?? false;

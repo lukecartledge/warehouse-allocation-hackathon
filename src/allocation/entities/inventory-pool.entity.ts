@@ -13,4 +13,7 @@ export class InventoryPoolEntity {
 
   @Column()
   availableToSell!: number;
+
+  @Column({ nullable: true })
+  source?: string;
 }

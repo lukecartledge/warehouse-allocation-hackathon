@@ -1,5 +1,5 @@
-import { ApiProperty } from '@nestjs/swagger';
-import { IsString, IsNotEmpty, IsInt, Min } from 'class-validator';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
+import { IsString, IsNotEmpty, IsInt, IsOptional, Min } from 'class-validator';
 
 export class InventoryPoolDto {
   @ApiProperty({
@@ -25,4 +25,15 @@ export class InventoryPoolDto {
   @IsInt()
   @Min(0)
   availableToSell!: number;
+
+  @ApiPropertyOptional({
+    description:
+      'Supply source name (e.g. "On-hand Inventory", "Transfer Orders"). ' +
+      'When omitted, defaults to the highest-priority source. ' +
+      'Used by the engine for multi-source fallthrough allocation.',
+    example: 'On-hand Inventory',
+  })
+  @IsOptional()
+  @IsString()
+  source?: string;
 }
