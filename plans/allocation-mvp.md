@@ -2,27 +2,31 @@
 
 ## Approach
 
-Build a NestJS REST API that accepts competing orders and available inventory,
-applies configurable multi-level priority ranking templates per demand type, and
-returns deterministic allocation results with reason codes. The demo runs entirely
-via Swagger UI using pre-seeded realistic scenarios — no frontend, no database,
-no external integrations required.
+Build a NestJS REST API that serves as the backend for the Inventory Allocation
+Engine frontend. All endpoints conform to the shared API contract defined in
+`plans/api.ts`. The API covers demand type management, supply source configuration,
+allocation template CRUD, engine execution with summary stats, and queryable
+allocation results. In-memory stores throughout — no database required.
+
+## API Contract Reference
+
+See `plans/api.ts` for the canonical type definitions. All endpoints are prefixed
+with `/api` via Swagger setup.
 
 ## Scope
 
 ### In
-- NestJS project scaffold with Swagger UI auto-docs
-- Core domain types: `Order`, `InventoryPool`, `RankingTemplate`, `AllocationResult`, `ReasonCode`
-- `RankingTemplateModule` — in-memory CRUD store, seeded with 3 default templates (Retail, Wholesale, D2C)
-- `AllocationEngine` service — multi-level sort → greedy ATS consumption → reason code tagging
-- `POST /allocate` — run the engine against a supplied order list + inventory snapshot
-- `GET/POST/PATCH /templates` — view and update ranking templates at runtime
-- `POST /demo/seed` — instantly loads a 20-order / 3-channel / 2-SKU scenario
-- Integration test asserting deterministic output for a fixed input
+- NestJS project scaffold with Swagger UI at `/api` ✅ (done)
+- **Demand Types module** — CRUD for demand type entities at `/api/demand-types`
+- **Supply module** — Supply source CRUD + config presets at `/api/supply/*`
+- **Allocation Templates module** — CRUD with dimensions + clearance at `/api/allocation-templates`
+- **Allocation Engine** — `POST /api/allocations/run` with filters, dry-run, summary stats
+- **Allocation Results** — `GET /api/allocations` with `?status=&channel=` filtering
+- **Demo seed** — `POST /api/demo/seed` populates all stores with realistic data
+- Integration test asserting deterministic output
 
 ### Out
-- Database persistence (SQLite, Postgres, etc.)
-- Frontend / UI (Swagger is the demo surface)
+- Database persistence
 - Auth / RBAC
 - Pegging windows, allocation horizons, intra-day triggers
 - Hard vs Soft allocation state machine
@@ -30,78 +34,130 @@ no external integrations required.
 
 ---
 
-## TODOs
+## Progress
 
-- [ ] **T1 — Scaffold**: Initialise NestJS project in `allocation-engine/`, enable strict TypeScript, install and configure `@nestjs/swagger`, add `class-validator` + `class-transformer`, wire `ValidationPipe` globally, confirm `GET /` returns 200 and Swagger UI loads at `/api`.
-
-- [ ] **T2 — Core types**: Create `src/allocation/types/` containing:
-  - `order.dto.ts` — `OrderDto` with fields: `orderId`, `demandType` (`RETAIL|WHOLESALE|D2C`), `channel`, `customerTier`, `shippingMethod`, `totalOrderValue`, `createdAt`, `requestedDeliveryDate`, `skuId`, `quantityRequested`
-  - `inventory.dto.ts` — `InventoryPoolDto` with fields: `skuId`, `warehouseId`, `availableToSell`
-  - `ranking-template.model.ts` — `RankingTemplate` with `id`, `demandType`, `levels: RankingLevel[]` where `RankingLevel` has `field: keyof OrderDto`, `direction: 'ASC'|'DESC'`, `order: number`
-  - `allocation-result.model.ts` — `AllocationResult` with `orderId`, `skuId`, `allocatedQty`, `status: 'ALLOCATED'|'PARTIAL'|'UNALLOCATED'`, `priorityRank`, `reasonCode: string`
-
-- [ ] **T3 — RankingTemplate module**: Create `src/ranking-template/` module with:
-  - `RankingTemplateService` — in-memory `Map<string, RankingTemplate>`, methods: `findAll()`, `findByDemandType(type)`, `upsert(template)`, `seed()` (loads 3 defaults below)
-  - Default templates seeded on app bootstrap:
-    - **Retail**: `[segment ASC, createdAt ASC, requestedDeliveryDate ASC]`
-    - **Wholesale**: `[customerTier ASC, createdAt ASC, requestedDeliveryDate ASC]`
-    - **D2C**: `[shippingMethod ASC, createdAt ASC, totalOrderValue DESC]`
-  - `RankingTemplateController` — `GET /templates`, `GET /templates/:demandType`, `PUT /templates/:demandType`
-  - Full Swagger decorators on all endpoints
-
-- [ ] **T4 — Allocation Engine**: Create `src/allocation/allocation-engine.service.ts`:
-  - Method: `allocate(orders: OrderDto[], inventory: InventoryPoolDto[]): AllocationResult[]`
-  - Step 1 — Group orders by `skuId + warehouseId`
-  - Step 2 — For each group, look up the `RankingTemplate` for the order's `demandType`
-  - Step 3 — Sort orders using the template's `levels` array (multi-key sort, deterministic tie-breaker = `orderId` lexicographic)
-  - Step 4 — Iterate sorted orders, greedily consume ATS: full fill → `ALLOCATED`, partial → `PARTIAL`, zero → `UNALLOCATED`
-  - Step 5 — Attach `priorityRank` (1-based position in sorted list) and `reasonCode` string (e.g. `"ALLOCATED via WHOLESALE template: tier=VIP, rank=1"`)
-  - Return full `AllocationResult[]` sorted by `priorityRank`
-
-- [ ] **T5 — Allocate endpoint + Demo seed**: Create `src/allocation/allocation.controller.ts`:
-  - `POST /allocate` — accepts `{ orders: OrderDto[], inventory: InventoryPoolDto[] }`, calls engine, returns results. Add Swagger `@ApiBody` with a minimal inline example.
-  - `POST /demo/seed` — no body required; loads the pre-built scenario (see below) and runs allocation, returning results directly so the demo is a single button click in Swagger.
-  - **Demo scenario** (hardcoded in a `demo.fixture.ts` file):
-    - 2 SKUs: `SKU-RUNNER-001`, `SKU-JACKET-002`
-    - 1 warehouse: `WH-ZURICH`
-    - ATS: `SKU-RUNNER-001 = 50 units`, `SKU-JACKET-002 = 30 units`
-    - 20 orders spread across RETAIL (8), WHOLESALE (7), D2C (5) with varying tiers, shipping methods, values, and dates — total demand intentionally exceeds ATS to show prioritisation in action
-
-- [ ] **T6 — Integration test**: Create `test/allocation.e2e-spec.ts`:
-  - Seed the default templates
-  - POST a fixed set of 5 orders (2 WHOLESALE VIP, 2 WHOLESALE STANDARD, 1 D2C) against 10 units ATS
-  - Assert: VIP orders allocated first, STANDARD partially/unallocated, reason codes present, output is deterministic across 3 repeated calls
-  - Run with `npm run test:e2e`
-
-- [ ] **T7 — Swagger polish + README**: 
-  - Add `@ApiOperation`, `@ApiResponse`, `@ApiProperty` descriptions to all DTOs and controllers so Swagger tells the business story
-  - Write a `README.md` in `allocation-engine/` with: what it does, how to run (`npm run start:dev`), how to demo (open `/api`, hit `/demo/seed` first, then explore `/templates`)
+- [x] **T1 — Scaffold** ✅
+- [x] **T2 — Core types** ✅ (needs reshaping — see T2b)
+- [x] **T3 — RankingTemplate module** ✅ (needs reshaping — see T3b)
 
 ---
 
-## Parallelisation Map
+## TODOs
 
-```
-Hour 0:00–0:30  →  P1: T1 (scaffold) — unblocks everyone
-Hour 0:30–1:30  →  P2: T3 (templates module)  |  P3: T4 (engine)  [parallel]
-                →  P1: T2 (types)              [feeds P2+P3]
-Hour 1:30–2:30  →  P4: T5 (endpoints, integrates T3+T4)
-                →  P5: T6 (integration test)   [parallel with P4]
-Hour 2:30–3:00  →  All: T7 (Swagger polish + README)
-Hour 3:00–3:30  →  Buffer: bug fixes, demo rehearsal
-```
+### Reshaping existing code to match api.ts
+
+- [ ] **T2b — Reshape core types to match api.ts contract**:
+  - **`src/allocation/types/allocation-result.model.ts`** — Update `AllocationResultDto` to match frontend `AllocationResult`:
+    - Add fields: `id`, `sku` (rename from `skuId`), `productName`, `channel`, `source: string | null`, `reason: string | null` (rename from `reasonCode`), `customer`, `orderDate`, `priority` (rename from `priorityRank`)
+    - Remove: `warehouseId`, `demandType`, `reasonCode`, `priorityRank`
+    - Change `AllocationStatus` to lowercase: `'allocated' | 'partial' | 'unallocated'`
+    - Rename `quantityRequested` → `requestedQty`, `allocatedQty` stays
+  - **`src/allocation/types/order.dto.ts`** — Add `productName: string` and `customer: string` fields (needed to populate result). Keep existing fields.
+  - **`src/allocation/types/inventory.dto.ts`** — Keep as-is (internal model for engine, not exposed to frontend)
+  - **New `src/allocation/types/allocate-request.dto.ts`**:
+    ```
+    AllocateRequestDto {
+      skus?: string[]
+      channels?: string[]
+      supplyOverrides?: Record<string, number>
+      strategyPreset?: 'conservative' | 'fast' | 'balanced'
+      dryRun?: boolean
+    }
+    ```
+  - **New `src/allocation/types/allocate-response.dto.ts`**:
+    ```
+    AllocateResponseDto {
+      runId: string
+      timestamp: string
+      dryRun: boolean
+      summary: {
+        totalOrders: number
+        totalRequested: number
+        totalAllocated: number
+        fillRate: number
+        allocated: number
+        partial: number
+        unallocated: number
+      }
+      results: AllocationResultDto[]
+    }
+    ```
+  - Update barrel `index.ts` with new exports
+  - Remove `ranking-template.model.ts` (replaced by allocation-template types in T3b)
+
+- [ ] **T3b — Reshape templates → Allocation Templates module**:
+  - **Rename/replace** `src/ranking-template/` → `src/allocation-template/`
+  - **New model** `AllocationTemplate`:
+    ```
+    { id, name, dimensions: RankingDimension[], clearanceLogic: boolean, clearanceMode: 'in-season' | 'drop-out' }
+    ```
+    where `RankingDimension` = `{ id, label, level }`
+  - **Routes change** from `/templates/:demandType` → `/allocation-templates/:id`
+  - **Full CRUD**: GET all, POST create, PUT update by id, DELETE by id
+  - **DTOs**: `CreateAllocationTemplateDto`, `UpdateAllocationTemplateDto` (Partial)
+  - **Seed 3 defaults**: Retail, Wholesale, D2C templates with appropriate dimensions
+  - **Service**: keyed by `id` not `demandType`
+  - Update `AppModule` imports
+
+### New modules
+
+- [ ] **T4 — Demand Types module** (`src/demand-type/`):
+  - **Model**: `DemandType { id, displayName, channel, orderType, allocationTemplate }`
+  - **DTOs**: `CreateDemandTypeDto { displayName, channel, orderType, allocationTemplate }`, `UpdateDemandTypeDto = Partial<Create>`
+  - **Service**: In-memory `Map<string, DemandType>`, full CRUD + seed defaults
+  - **Controller** at `/demand-types`: GET all, POST create, PUT `:id`, DELETE `:id`
+  - **Seed defaults** on startup:
+    - `{ id: 'dt-retail', displayName: 'Retail', channel: 'Retail', orderType: 'Standard Ship', allocationTemplate: 'tpl-retail' }`
+    - `{ id: 'dt-wholesale', displayName: 'Wholesale', channel: 'Wholesale', orderType: 'Standard Ship', allocationTemplate: 'tpl-wholesale' }`
+    - `{ id: 'dt-d2c', displayName: 'D2C', channel: 'D2C', orderType: 'Express', allocationTemplate: 'tpl-d2c' }`
+    - `{ id: 'dt-marketplace', displayName: 'Marketplace', channel: 'Marketplace', orderType: 'Standard Ship', allocationTemplate: 'tpl-retail' }`
+  - Register in `AppModule`
+
+- [ ] **T5 — Supply module** (`src/supply/`):
+  - **Models**: `SupplySource { id, name, description, priority }`, `SupplyConfig { activePreset, sequence: SupplySource[] }`, `StrategyPreset = 'conservative' | 'fast' | 'balanced'`
+  - **DTOs**: `CreateSupplySourceDto`, `UpdateSupplySourceDto` (Partial)
+  - **Service**: In-memory store for sources + config. Methods for preset switching + custom sequence.
+  - **Controller** at `/supply`:
+    - `GET /supply/config` → SupplyConfig
+    - `PUT /supply/config/preset` → SupplyConfig (body: `{ preset }`)
+    - `PUT /supply/config/sequence` → SupplyConfig (body: `{ sequence }`)
+    - `POST /supply/sources` → SupplySource
+    - `PUT /supply/sources/:id` → SupplySource
+    - `DELETE /supply/sources/:id` → void
+  - **Seed defaults**: 3 supply sources (On-hand, Transfer Orders, Inbound POs) with preset configs
+  - Register in `AppModule`
+
+### Engine + Results
+
+- [ ] **T6 — Allocation Engine service** (`src/allocation/allocation-engine.service.ts`):
+  - Method: `run(request: AllocateRequestDto): AllocateResponseDto`
+  - Injects `AllocationTemplateService`, `DemandTypeService`, `SupplyService`
+  - Uses seeded orders from in-memory store (populated via demo seed)
+  - Algorithm: group by SKU → rank by template dimensions → greedy ATS → tag with reason
+  - Generates `runId` (uuid), `timestamp`, `summary` with fillRate + counts
+  - Respects `dryRun` flag (if false, persists results to in-memory store)
+  - Supports `skus[]` and `channels[]` filters on the request
+  - Returns `AllocateResponseDto` matching the api.ts contract
+
+- [ ] **T7 — Allocation Results + Engine endpoints** (`src/allocation/`):
+  - **Allocation module** with controller at `/allocations`:
+    - `POST /allocations/run` → `AllocateResponseDto` (body: `AllocateRequestDto`)
+    - `GET /allocations` → `AllocationResultDto[]` with query filters `?status=&channel=`
+  - **In-memory results store**: persists last run's results for GET queries
+  - **Demo seed endpoint**: `POST /demo/seed` — populates orders, inventory, and runs allocation
+  - Register in `AppModule`
+
+### Finish
+
+- [ ] **T8 — Integration test**: Assert deterministic allocation output, summary stats, filtering
+- [ ] **T9 — Swagger polish + README**: Full API documentation matching api.ts
 
 ---
 
 ## Validation
 
 - `npm run test:e2e` passes with deterministic allocation assertions
-- `POST /demo/seed` returns 20 allocation results with reason codes in < 200ms
-- Changing a ranking template via `PUT /templates/WHOLESALE` and re-running `/demo/seed` produces a visibly different allocation order — this is the "wow moment" for the demo
-
----
-
-## Open Questions
-
-- Should `customerTier` be a free-form string or an enum (`VIP | PREMIUM | STANDARD`)? Assuming enum for deterministic sorting.
-- Do we want the demo scenario to include a "before/after template change" story baked into `/demo/seed`, or keep it as two separate calls?
+- `POST /api/demo/seed` populates all stores and returns allocation results with summary
+- All endpoints from `api.ts` return expected shapes
+- `GET /api/allocations?status=unallocated&channel=D2C` returns filtered results
+- Changing a template via `PUT /api/allocation-templates/:id` and re-running `POST /api/allocations/run` produces different results — the "wow moment"

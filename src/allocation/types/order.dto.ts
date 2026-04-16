@@ -112,4 +112,18 @@ export class OrderDto {
   @IsInt()
   @Min(1)
   quantityRequested!: number;
+
+  @ApiProperty({
+    description: 'Product name',
+    example: 'Cloud Runner 2',
+  })
+  @IsString()
+  productName!: string;
+
+  @ApiProperty({
+    description: 'Customer name',
+    example: 'SportCo International',
+  })
+  @IsString()
+  customer!: string;
 }

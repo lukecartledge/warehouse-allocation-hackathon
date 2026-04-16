@@ -1,64 +1,44 @@
-import { ApiProperty } from '@nestjs/swagger';
+import { ApiProperty, ApiPropertyOptional } from '@nestjs/swagger';
 
-export enum AllocationStatus {
-  ALLOCATED = 'ALLOCATED',
-  PARTIAL = 'PARTIAL',
-  UNALLOCATED = 'UNALLOCATED',
-}
+export type AllocationStatus = 'allocated' | 'partial' | 'unallocated';
 
 export class AllocationResultDto {
-  @ApiProperty({
-    description: 'Order identifier',
-    example: 'ORD-2024-001',
-  })
+  @ApiProperty({ example: 'res-001' })
+  id!: string;
+
+  @ApiProperty({ example: 'ORD-2024-001' })
   orderId!: string;
 
-  @ApiProperty({
-    description: 'Stock keeping unit identifier',
-    example: 'SKU-12345',
-  })
-  skuId!: string;
+  @ApiProperty({ example: 'SKU-RUNNER-001' })
+  sku!: string;
 
-  @ApiProperty({
-    description: 'Warehouse identifier',
-    example: 'WH-EAST-01',
-  })
-  warehouseId!: string;
+  @ApiProperty({ example: 'Cloud Runner 2' })
+  productName!: string;
 
-  @ApiProperty({
-    description: 'Quantity requested',
-    example: 5,
-  })
-  quantityRequested!: number;
+  @ApiProperty({ example: 'Wholesale' })
+  channel!: string;
 
-  @ApiProperty({
-    description: 'Quantity allocated',
-    example: 5,
-  })
+  @ApiProperty({ example: 10 })
+  requestedQty!: number;
+
+  @ApiProperty({ example: 10 })
   allocatedQty!: number;
 
-  @ApiProperty({
-    description: 'Allocation status',
-    enum: AllocationStatus,
-    example: AllocationStatus.ALLOCATED,
-  })
+  @ApiProperty({ enum: ['allocated', 'partial', 'unallocated'], example: 'allocated' })
   status!: AllocationStatus;
 
-  @ApiProperty({
-    description: 'Priority rank in allocation queue',
-    example: 1,
-  })
-  priorityRank!: number;
+  @ApiPropertyOptional({ example: 'On-hand', nullable: true })
+  source!: string | null;
 
-  @ApiProperty({
-    description: 'Reason code for allocation decision',
-    example: 'SUFFICIENT_INVENTORY',
-  })
-  reasonCode!: string;
+  @ApiPropertyOptional({ example: 'Allocated via Wholesale template: tier=VIP, rank=1', nullable: true })
+  reason!: string | null;
 
-  @ApiProperty({
-    description: 'Demand type',
-    example: 'RETAIL',
-  })
-  demandType!: string;
+  @ApiProperty({ example: 'SportCo International' })
+  customer!: string;
+
+  @ApiProperty({ example: '2024-01-15T10:30:00Z' })
+  orderDate!: string;
+
+  @ApiProperty({ example: 1 })
+  priority!: number;
 }
