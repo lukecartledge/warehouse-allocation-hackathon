@@ -29,7 +29,8 @@ export class DemandTypeController {
   @ApiOperation({
     summary: 'Get all demand types',
     description:
-      'Returns all configured demand types ordered by priority. ' +
+      'Returns all configured demand types ordered by priority (ascending). ' +
+      'Lower priority number = higher allocation priority (e.g. D2C at 1 is allocated before Wholesale at 3). ' +
       'Each demand type maps a channel + order-type combination to an allocation template.',
   })
   @ApiResponse({
@@ -45,8 +46,8 @@ export class DemandTypeController {
   @ApiOperation({
     summary: 'Create a new demand type',
     description:
-      'Registers a new demand type. The engine uses demand types to determine which ' +
-      'allocation template to apply for incoming orders. Priority is implied by insertion order.',
+      'Registers a new demand type with an explicit priority. The engine uses demand types to determine which ' +
+      'allocation template to apply for incoming orders. Lower priority number = allocated first.',
   })
   @ApiResponse({
     status: 201,

@@ -16,12 +16,24 @@ export class AllocateRequestDto {
   @IsString({ each: true })
   channels?: string[];
 
-  @ApiPropertyOptional({ description: 'Override available supply per SKU', example: { 'SKU-RUNNER-001': 100 } })
+  @ApiPropertyOptional({
+    description:
+      'Override available supply per SKU. Keyed by SKU ID (e.g. "SKU-RUNNER-001"). ' +
+      'Value sets the available-to-sell quantity for all matching inventory pools.',
+    example: { 'SKU-RUNNER-001': 100 },
+  })
   @IsOptional()
   @IsObject()
   supplyOverrides?: Record<string, number>;
 
-  @ApiPropertyOptional({ description: 'Strategy preset to use', enum: ['conservative', 'fast', 'balanced'] })
+  @ApiPropertyOptional({
+    description:
+      'Strategy preset that modifies engine behaviour. ' +
+      '`conservative`: reduces effective ATS by 20% (safety stock hold-back). ' +
+      '`fast`: no safety stock, prefers earliest requestedDeliveryDate. ' +
+      '`balanced`: default — no modification.',
+    enum: ['conservative', 'fast', 'balanced'],
+  })
   @IsOptional()
   @IsIn(['conservative', 'fast', 'balanced'])
   strategyPreset?: StrategyPreset;
