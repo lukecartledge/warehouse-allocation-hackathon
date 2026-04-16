@@ -46,6 +46,8 @@ export class AllocationService {
   }
 
   async run(request: AllocateRequestDto): Promise<AllocateResponseDto> {
+    const activePreset = request.strategyPreset ?? 'balanced';
+
     if (request.strategyPreset) {
       await this.supplyService.setPreset(request.strategyPreset);
     }
@@ -70,7 +72,7 @@ export class AllocationService {
       })),
       request.supplyOverrides,
     );
-    const results = await this.engine.allocate(filteredOrders, inventory);
+    const results = await this.engine.allocate(filteredOrders, inventory, activePreset);
     const summary = this.buildSummary(results);
     const runId = randomUUID();
     const dryRun = request.dryRun ?? false;

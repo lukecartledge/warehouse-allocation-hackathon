@@ -13,6 +13,8 @@ import { DemandTypeService } from '../demand-type/demand-type.service.js';
 import type { DemandType } from '../demand-type/types.js';
 import { SupplyService } from '../supply/supply.service.js';
 
+import type { StrategyPreset } from '../supply/types.js';
+
 const CUSTOMER_TIER_RANK: Record<string, number> = {
   VIP: 1,
   PREMIUM: 2,
@@ -35,6 +37,16 @@ const FALLBACK_LEVELS: RankingDimension[] = [
   },
 ];
 
+const CONSERVATIVE_SAFETY_STOCK_FACTOR = 0.8;
+
+const FAST_DELIVERY_SORT: RankingDimension[] = [
+  {
+    id: 'dim-fast-delivery',
+    label: 'Earliest Delivery',
+    level: 'requestedDeliveryDate',
+  },
+];
+
 @Injectable()
 export class AllocationEngineService {
   constructor(
@@ -46,8 +58,18 @@ export class AllocationEngineService {
   async allocate(
     orders: OrderDto[],
     inventory: InventoryPoolDto[],
+    preset: StrategyPreset = 'balanced',
   ): Promise<AllocationResultDto[]> {
-    const atsByPoolKey = this.buildAtsLookup(inventory);
+    const effectiveInventory =
+      preset === 'conservative'
+        ? inventory.map((pool) => ({
+            ...pool,
+            availableToSell: Math.floor(
+              pool.availableToSell * CONSERVATIVE_SAFETY_STOCK_FACTOR,
+            ),
+          }))
+        : inventory;
+    const atsByPoolKey = this.buildAtsLookup(effectiveInventory);
     const ordersByPoolKey = this.groupOrdersByPoolKey(orders);
     const demandTypes = await this.demandTypeService.findAll();
     const demandTypePriorityByOrderDemandType =
@@ -67,6 +89,7 @@ export class AllocationEngineService {
           right,
           templatesByDemandType,
           demandTypePriorityByOrderDemandType,
+          preset,
         ),
       );
 
@@ -209,6 +232,7 @@ export class AllocationEngineService {
     right: OrderDto,
     templatesByDemandType: Map<string, AllocationTemplate | undefined>,
     demandTypePriorityByOrderDemandType: Map<string, number>,
+    preset: StrategyPreset = 'balanced',
   ): number {
     if (left.demandType !== right.demandType) {
       const demandPriorityComparison =
@@ -236,7 +260,7 @@ export class AllocationEngineService {
     }
 
     const template = templatesByDemandType.get(left.demandType);
-    const levels = this.getSortedLevels(template);
+    const levels = this.getSortedLevels(template, preset);
 
     for (const level of levels) {
       const levelComparison = this.compareByLevel(left, right, level);
@@ -348,12 +372,19 @@ export class AllocationEngineService {
 
   private getSortedLevels(
     template: AllocationTemplate | undefined,
+    preset: StrategyPreset = 'balanced',
   ): RankingDimension[] {
-    if (!template) {
-      return FALLBACK_LEVELS;
+    const baseLevels = template ? template.dimensions : FALLBACK_LEVELS;
+
+    // Fast preset: prepend earliest delivery date as the primary sort
+    if (preset === 'fast') {
+      const hasDeliveryDate = baseLevels.some(
+        (level) => level.level === 'requestedDeliveryDate',
+      );
+      return hasDeliveryDate ? baseLevels : [...FAST_DELIVERY_SORT, ...baseLevels];
     }
 
-    return template.dimensions;
+    return baseLevels;
   }
 
   private buildPoolKey(skuId: string, warehouseId: string): string {
