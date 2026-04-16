@@ -34,7 +34,7 @@ export class AllocationTemplateController {
   @Get()
   @ApiOperation({ summary: 'List all allocation templates' })
   @ApiOkResponse({ type: [Object], description: 'All allocation templates' })
-  findAll(): AllocationTemplate[] {
+  async findAll(): Promise<AllocationTemplate[]> {
     return this.allocationTemplateService.findAll();
   }
 
@@ -48,7 +48,9 @@ export class AllocationTemplateController {
     type: Object,
     description: 'Created allocation template',
   })
-  create(@Body() body: CreateAllocationTemplateDto): AllocationTemplate {
+  async create(
+    @Body() body: CreateAllocationTemplateDto,
+  ): Promise<AllocationTemplate> {
     return this.allocationTemplateService.create(body);
   }
 
@@ -61,11 +63,11 @@ export class AllocationTemplateController {
   })
   @ApiOkResponse({ type: Object, description: 'Updated allocation template' })
   @ApiNotFoundResponse({ description: 'Allocation template not found' })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() body: UpdateAllocationTemplateDto,
-  ): AllocationTemplate {
-    const updatedTemplate = this.allocationTemplateService.update(id, body);
+  ): Promise<AllocationTemplate> {
+    const updatedTemplate = await this.allocationTemplateService.update(id, body);
 
     if (!updatedTemplate) {
       throw new NotFoundException(`Allocation template not found: ${id}`);
@@ -80,8 +82,8 @@ export class AllocationTemplateController {
   @ApiParam({ name: 'id', example: 'tpl-retail' })
   @ApiNoContentResponse({ description: 'Allocation template deleted' })
   @ApiNotFoundResponse({ description: 'Allocation template not found' })
-  remove(@Param('id') id: string): void {
-    const removed = this.allocationTemplateService.remove(id);
+  async remove(@Param('id') id: string): Promise<void> {
+    const removed = await this.allocationTemplateService.remove(id);
 
     if (!removed) {
       throw new NotFoundException(`Allocation template not found: ${id}`);

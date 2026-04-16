@@ -20,7 +20,7 @@ export class DemoController {
     type: AllocateResponseDto,
     description: 'Demo data seeded and allocation run completed.',
   })
-  seed(): AllocateResponseDto {
+  async seed(): Promise<AllocateResponseDto> {
     return this.allocationService.seedDemo();
   }
 }

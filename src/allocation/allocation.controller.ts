@@ -31,7 +31,7 @@ export class AllocationController {
     type: AllocateResponseDto,
     description: 'Allocation run completed — returns run ID, summary stats, and per-order results.',
   })
-  run(@Body() request: AllocateRequestDto): AllocateResponseDto {
+  async run(@Body() request: AllocateRequestDto): Promise<AllocateResponseDto> {
     return this.allocationService.run(request);
   }
 
@@ -56,7 +56,7 @@ export class AllocationController {
   findAll(
     @Query('status') status?: string,
     @Query('channel') channel?: string,
-  ): AllocationResultDto[] {
+  ): Promise<AllocationResultDto[]> {
     return this.allocationService.queryResults(status, channel);
   }
 }

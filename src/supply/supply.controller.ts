@@ -49,7 +49,7 @@ export class SupplyController {
     description: 'Returns the active strategy preset and the ordered list of supply sources.',
   })
   @ApiOkResponse({ description: 'Current supply configuration including preset and source sequence.' })
-  getConfig(): SupplyConfig {
+  async getConfig(): Promise<SupplyConfig> {
     return this.supplyService.getConfig();
   }
 
@@ -71,7 +71,7 @@ export class SupplyController {
     description: 'Strategy preset to activate',
   })
   @ApiOkResponse({ description: 'Updated supply configuration.' })
-  setPreset(@Body() dto: SetPresetDto): SupplyConfig {
+  async setPreset(@Body() dto: SetPresetDto): Promise<SupplyConfig> {
     return this.supplyService.setPreset(dto.preset);
   }
 
@@ -97,7 +97,7 @@ export class SupplyController {
     description: 'New supply source sequence',
   })
   @ApiOkResponse({ description: 'Updated supply configuration with new sequence.' })
-  setSequence(@Body() dto: SetSequenceDto): SupplyConfig {
+  async setSequence(@Body() dto: SetSequenceDto): Promise<SupplyConfig> {
     return this.supplyService.setSequence(dto.sequence);
   }
 
@@ -108,7 +108,7 @@ export class SupplyController {
   })
   @ApiBody({ type: CreateSupplySourceDto, description: 'Supply source details' })
   @ApiCreatedResponse({ description: 'Supply source created successfully.' })
-  createSource(@Body() dto: CreateSupplySourceDto): SupplySource {
+  async createSource(@Body() dto: CreateSupplySourceDto): Promise<SupplySource> {
     return this.supplyService.createSource(dto);
   }
 
@@ -121,11 +121,11 @@ export class SupplyController {
   @ApiBody({ type: UpdateSupplySourceDto, description: 'Fields to update' })
   @ApiOkResponse({ description: 'Updated supply source.' })
   @ApiNotFoundResponse({ description: 'Supply source not found.' })
-  updateSource(
+  async updateSource(
     @Param('id') id: string,
     @Body() dto: UpdateSupplySourceDto,
-  ): SupplySource {
-    const updated = this.supplyService.updateSource(id, dto);
+  ): Promise<SupplySource> {
+    const updated = await this.supplyService.updateSource(id, dto);
     if (!updated) {
       throw new NotFoundException(`Supply source with id ${id} not found`);
     }
@@ -141,8 +141,8 @@ export class SupplyController {
   @ApiParam({ name: 'id', description: 'Supply source ID', example: 'src-warehouse-east' })
   @ApiNoContentResponse({ description: 'Supply source deleted.' })
   @ApiNotFoundResponse({ description: 'Supply source not found.' })
-  removeSource(@Param('id') id: string): void {
-    const deleted = this.supplyService.removeSource(id);
+  async removeSource(@Param('id') id: string): Promise<void> {
+    const deleted = await this.supplyService.removeSource(id);
     if (!deleted) {
       throw new NotFoundException(`Supply source with id ${id} not found`);
     }

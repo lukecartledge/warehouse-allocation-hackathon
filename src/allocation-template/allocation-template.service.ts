@@ -1,52 +1,63 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import type { CreateAllocationTemplateDto } from './dto/create-allocation-template.dto.js';
 import type { UpdateAllocationTemplateDto } from './dto/update-allocation-template.dto.js';
+import { AllocationTemplateEntity } from './allocation-template.entity.js';
 import type { AllocationTemplate, RankingDimension } from './types.js';
 
 @Injectable()
 export class AllocationTemplateService {
-  private readonly templates = new Map<string, AllocationTemplate>();
+  constructor(
+    @InjectRepository(AllocationTemplateEntity)
+    private readonly repo: Repository<AllocationTemplateEntity>,
+  ) {}
 
-  constructor() {
-    this.seed();
+  async onModuleInit(): Promise<void> {
+    await this.seed();
   }
 
-  findAll(): AllocationTemplate[] {
-    return Array.from(this.templates.values());
+  async findAll(): Promise<AllocationTemplate[]> {
+    const entities = await this.repo.find();
+    return entities.map((entity) => this.toModel(entity));
   }
 
-  findById(id: string): AllocationTemplate | undefined {
-    return this.templates.get(id);
+  async findById(id: string): Promise<AllocationTemplate | undefined> {
+    const entity = await this.repo.findOneBy({ id });
+    return entity ? this.toModel(entity) : undefined;
   }
 
-  create(dto: CreateAllocationTemplateDto): AllocationTemplate {
-    const createdTemplate: AllocationTemplate = {
+  async create(dto: CreateAllocationTemplateDto): Promise<AllocationTemplate> {
+    const createdTemplate: AllocationTemplateEntity = {
       id: randomUUID(),
       name: dto.name,
-      dimensions: dto.dimensions.map((dimension) => ({
-        id: randomUUID(),
-        label: dimension.label,
-        level: dimension.level,
-      })),
+      dimensions: JSON.stringify(
+        dto.dimensions.map((dimension) => ({
+          id: randomUUID(),
+          label: dimension.label,
+          level: dimension.level,
+        })),
+      ),
       clearanceLogic: dto.clearanceLogic,
       clearanceMode: dto.clearanceMode,
     };
 
-    this.templates.set(createdTemplate.id, createdTemplate);
-    return createdTemplate;
+    const saved = await this.repo.save(createdTemplate);
+    return this.toModel(saved);
   }
 
-  update(
+  async update(
     id: string,
     dto: UpdateAllocationTemplateDto,
-  ): AllocationTemplate | undefined {
-    const existingTemplate = this.templates.get(id);
+  ): Promise<AllocationTemplate | undefined> {
+    const existingTemplate = await this.repo.findOneBy({ id });
 
     if (!existingTemplate) {
       return undefined;
     }
 
+    const currentDimensions = this.parseDimensions(existingTemplate.dimensions);
     const updatedDimensions: RankingDimension[] =
       dto.dimensions !== undefined
         ? dto.dimensions.map((dimension) => ({
@@ -54,24 +65,28 @@ export class AllocationTemplateService {
             label: dimension.label,
             level: dimension.level,
           }))
-        : existingTemplate.dimensions;
+        : currentDimensions;
 
-    const updatedTemplate: AllocationTemplate = {
+    const updatedTemplate: AllocationTemplateEntity = {
       ...existingTemplate,
       ...dto,
-      dimensions: updatedDimensions,
+      dimensions: JSON.stringify(updatedDimensions),
     };
 
-    this.templates.set(id, updatedTemplate);
-    return updatedTemplate;
+    const saved = await this.repo.save(updatedTemplate);
+    return this.toModel(saved);
   }
 
-  remove(id: string): boolean {
-    return this.templates.delete(id);
+  async remove(id: string): Promise<boolean> {
+    const result = await this.repo.delete(id);
+    return (result.affected ?? 0) > 0;
   }
 
-  seed(): void {
-    this.templates.clear();
+  private async seed(): Promise<void> {
+    const count = await this.repo.count();
+    if (count > 0) {
+      return;
+    }
 
     const defaults: AllocationTemplate[] = [
       {
@@ -117,8 +132,25 @@ export class AllocationTemplateService {
       },
     ];
 
-    for (const template of defaults) {
-      this.templates.set(template.id, template);
-    }
+    await this.repo.save(
+      defaults.map((template) => ({
+        ...template,
+        dimensions: JSON.stringify(template.dimensions),
+      })),
+    );
+  }
+
+  private toModel(entity: AllocationTemplateEntity): AllocationTemplate {
+    return {
+      id: entity.id,
+      name: entity.name,
+      dimensions: this.parseDimensions(entity.dimensions),
+      clearanceLogic: entity.clearanceLogic,
+      clearanceMode: entity.clearanceMode as 'in-season' | 'drop-out',
+    };
+  }
+
+  private parseDimensions(dimensions: string): RankingDimension[] {
+    return JSON.parse(dimensions) as RankingDimension[];
   }
 }

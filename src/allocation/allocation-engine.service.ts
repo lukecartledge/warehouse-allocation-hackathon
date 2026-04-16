@@ -43,20 +43,20 @@ export class AllocationEngineService {
     private readonly supplyService: SupplyService,
   ) {}
 
-  allocate(
+  async allocate(
     orders: OrderDto[],
     inventory: InventoryPoolDto[],
-  ): AllocationResultDto[] {
+  ): Promise<AllocationResultDto[]> {
     const atsByPoolKey = this.buildAtsLookup(inventory);
     const ordersByPoolKey = this.groupOrdersByPoolKey(orders);
-    const demandTypes = this.demandTypeService.findAll();
+    const demandTypes = await this.demandTypeService.findAll();
     const demandTypePriorityByOrderDemandType =
       this.buildDemandTypePriorityLookup(demandTypes);
-    const templatesByDemandType = this.buildDemandTypeTemplateLookup(
+    const templatesByDemandType = await this.buildDemandTypeTemplateLookup(
       orders,
       demandTypes,
     );
-    const source = this.supplyService.getConfig().sequence[0]?.name ?? 'Unknown';
+    const source = (await this.supplyService.getConfig()).sequence[0]?.name ?? 'Unknown';
 
     const results: AllocationResultDto[] = [];
 
@@ -161,10 +161,10 @@ export class AllocationEngineService {
     return ordersByPoolKey;
   }
 
-  private buildDemandTypeTemplateLookup(
+  private async buildDemandTypeTemplateLookup(
     orders: OrderDto[],
     demandTypes: DemandType[],
-  ): Map<string, AllocationTemplate | undefined> {
+  ): Promise<Map<string, AllocationTemplate | undefined>> {
     const templatesByDemandType = new Map<
       string,
       AllocationTemplate | undefined
@@ -180,7 +180,7 @@ export class AllocationEngineService {
         templatesByDemandType.set(
           order.demandType,
           matchingDemandType
-            ? this.allocationTemplateService.findById(
+            ? await this.allocationTemplateService.findById(
                 matchingDemandType.allocationTemplate,
               )
             : undefined,

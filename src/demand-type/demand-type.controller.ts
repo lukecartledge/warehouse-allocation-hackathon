@@ -32,7 +32,7 @@ export class DemandTypeController {
     description: 'List of all demand types',
     type: [Object],
   })
-  findAll(): DemandType[] {
+  async findAll(): Promise<DemandType[]> {
     return this.demandTypeService.findAll();
   }
 
@@ -43,7 +43,9 @@ export class DemandTypeController {
     description: 'Demand type created successfully',
     type: Object,
   })
-  create(@Body() createDemandTypeDto: CreateDemandTypeDto): DemandType {
+  async create(
+    @Body() createDemandTypeDto: CreateDemandTypeDto,
+  ): Promise<DemandType> {
     return this.demandTypeService.create(createDemandTypeDto);
   }
 
@@ -56,11 +58,11 @@ export class DemandTypeController {
     type: Object,
   })
   @ApiResponse({ status: 404, description: 'Demand type not found' })
-  update(
+  async update(
     @Param('id') id: string,
     @Body() updateDemandTypeDto: UpdateDemandTypeDto,
-  ): DemandType {
-    const updated = this.demandTypeService.update(id, updateDemandTypeDto);
+  ): Promise<DemandType> {
+    const updated = await this.demandTypeService.update(id, updateDemandTypeDto);
     if (!updated) {
       throw new NotFoundException(`Demand type with ID ${id} not found`);
     }
@@ -73,8 +75,8 @@ export class DemandTypeController {
   @ApiParam({ name: 'id', description: 'Demand type ID' })
   @ApiResponse({ status: 204, description: 'Demand type deleted successfully' })
   @ApiResponse({ status: 404, description: 'Demand type not found' })
-  remove(@Param('id') id: string): void {
-    const deleted = this.demandTypeService.remove(id);
+  async remove(@Param('id') id: string): Promise<void> {
+    const deleted = await this.demandTypeService.remove(id);
     if (!deleted) {
       throw new NotFoundException(`Demand type with ID ${id} not found`);
     }

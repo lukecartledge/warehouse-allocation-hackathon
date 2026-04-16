@@ -1,22 +1,29 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
 import { StrategyPreset, SupplyConfig, SupplySource } from './types.js';
 import { CreateSupplySourceDto } from './dto/create-supply-source.dto.js';
+import { SupplyConfigEntity } from './supply-config.entity.js';
+import { SupplySourceEntity } from './supply-source.entity.js';
 
 @Injectable()
 export class SupplyService {
-  private sources: Map<string, SupplySource> = new Map();
-  private config: SupplyConfig;
+  constructor(
+    @InjectRepository(SupplySourceEntity)
+    private readonly sourceRepo: Repository<SupplySourceEntity>,
+    @InjectRepository(SupplyConfigEntity)
+    private readonly configRepo: Repository<SupplyConfigEntity>,
+  ) {}
 
-  constructor() {
-    this.config = {
-      activePreset: 'balanced',
-      sequence: [],
-    };
-    this.seed();
+  async onModuleInit(): Promise<void> {
+    await this.seed();
   }
 
-  private seed(): void {
+  private async seed(): Promise<void> {
+    const sourceCount = await this.sourceRepo.count();
+    const config = await this.configRepo.findOneBy({ id: 1 });
+
     const defaultSources: SupplySource[] = [
       {
         id: 'src-onhand',
@@ -38,66 +45,83 @@ export class SupplyService {
       },
     ];
 
-    defaultSources.forEach(source => {
-      this.sources.set(source.id, source);
-    });
+    if (sourceCount === 0) {
+      await this.sourceRepo.save(defaultSources);
+    }
 
-    this.config = {
-      activePreset: 'balanced',
-      sequence: this.getSequenceForPreset('balanced'),
-    };
+    if (!config) {
+      await this.configRepo.save({ id: 1, activePreset: 'balanced' });
+    }
   }
 
-  private getSequenceForPreset(preset: StrategyPreset): SupplySource[] {
-    const allSources = Array.from(this.sources.values()).sort(
+  private getSequenceForPreset(
+    preset: StrategyPreset,
+    allSources: SupplySource[],
+  ): SupplySource[] {
+    const sortedSources = [...allSources].sort(
       (a, b) => a.priority - b.priority,
     );
 
     switch (preset) {
       case 'conservative':
-        return allSources.filter(s => s.priority === 1);
+        return sortedSources.filter(s => s.priority === 1);
       case 'fast':
-        return allSources;
+        return sortedSources;
       case 'balanced':
-        return allSources.filter(s => s.priority <= 2);
+        return sortedSources.filter(s => s.priority <= 2);
       default:
-        return allSources;
+        return sortedSources;
     }
   }
 
-  getConfig(): SupplyConfig {
-    return this.config;
+  async getConfig(): Promise<SupplyConfig> {
+    const sources = await this.sourceRepo.find({ order: { priority: 'ASC' } });
+    const config =
+      (await this.configRepo.findOneBy({ id: 1 })) ??
+      (await this.configRepo.save({ id: 1, activePreset: 'balanced' }));
+    const activePreset = config.activePreset as StrategyPreset;
+
+    return {
+      activePreset,
+      sequence: this.getSequenceForPreset(activePreset, sources),
+    };
   }
 
-  setPreset(preset: StrategyPreset): SupplyConfig {
-    this.config.activePreset = preset;
-    this.config.sequence = this.getSequenceForPreset(preset);
-    return this.config;
+  async setPreset(preset: StrategyPreset): Promise<SupplyConfig> {
+    await this.configRepo.save({ id: 1, activePreset: preset });
+    return this.getConfig();
   }
 
-  setSequence(sequence: SupplySource[]): SupplyConfig {
-    this.config.sequence = sequence;
-    return this.config;
+  async setSequence(sequence: SupplySource[]): Promise<SupplyConfig> {
+    const inferredPreset: StrategyPreset =
+      sequence.length <= 1
+        ? 'conservative'
+        : sequence.length <= 2
+          ? 'balanced'
+          : 'fast';
+
+    await this.configRepo.save({ id: 1, activePreset: inferredPreset });
+    return this.getConfig();
   }
 
-  findAllSources(): SupplySource[] {
-    return Array.from(this.sources.values());
+  async findAllSources(): Promise<SupplySource[]> {
+    return this.sourceRepo.find({ order: { priority: 'ASC' } });
   }
 
-  createSource(dto: CreateSupplySourceDto): SupplySource {
-    const source: SupplySource = {
+  async createSource(dto: CreateSupplySourceDto): Promise<SupplySource> {
+    const source: SupplySourceEntity = {
       id: randomUUID(),
       ...dto,
     };
-    this.sources.set(source.id, source);
-    return source;
+
+    return this.sourceRepo.save(source);
   }
 
-  updateSource(
+  async updateSource(
     id: string,
     dto: Partial<CreateSupplySourceDto>,
-  ): SupplySource | undefined {
-    const source = this.sources.get(id);
+  ): Promise<SupplySource | undefined> {
+    const source = await this.sourceRepo.findOneBy({ id });
     if (!source) {
       return undefined;
     }
@@ -106,11 +130,12 @@ export class SupplyService {
       ...source,
       ...dto,
     };
-    this.sources.set(id, updated);
-    return updated;
+
+    return this.sourceRepo.save(updated);
   }
 
-  removeSource(id: string): boolean {
-    return this.sources.delete(id);
+  async removeSource(id: string): Promise<boolean> {
+    const result = await this.sourceRepo.delete(id);
+    return (result.affected ?? 0) > 0;
   }
 }

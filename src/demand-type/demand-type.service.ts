@@ -1,41 +1,52 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'crypto';
+import { InjectRepository } from '@nestjs/typeorm';
+import { Repository } from 'typeorm';
+import { DemandTypeEntity } from './demand-type.entity.js';
 import { DemandType } from './types.js';
 import { CreateDemandTypeDto } from './dto/create-demand-type.dto.js';
 
 @Injectable()
 export class DemandTypeService {
-  private demandTypes = new Map<string, DemandType>();
+  constructor(
+    @InjectRepository(DemandTypeEntity)
+    private readonly repo: Repository<DemandTypeEntity>,
+  ) {}
 
-  constructor() {
-    this.seed();
+  async onModuleInit(): Promise<void> {
+    await this.seed();
   }
 
-  private seed(): void {
+  private async seed(): Promise<void> {
+    const count = await this.repo.count();
+    if (count > 0) {
+      return;
+    }
+
     const defaults: DemandType[] = [
       {
-        id: 'dt-retail',
+        id: 'dt-1-retail',
         displayName: 'Retail',
         channel: 'Retail',
         orderType: 'Standard Ship',
         allocationTemplate: 'tpl-retail',
       },
       {
-        id: 'dt-wholesale',
+        id: 'dt-2-wholesale',
         displayName: 'Wholesale',
         channel: 'Wholesale',
         orderType: 'Standard Ship',
         allocationTemplate: 'tpl-wholesale',
       },
       {
-        id: 'dt-d2c',
+        id: 'dt-3-d2c',
         displayName: 'D2C',
         channel: 'D2C',
         orderType: 'Express',
         allocationTemplate: 'tpl-d2c',
       },
       {
-        id: 'dt-marketplace',
+        id: 'dt-4-marketplace',
         displayName: 'Marketplace',
         channel: 'Marketplace',
         orderType: 'Standard Ship',
@@ -43,43 +54,47 @@ export class DemandTypeService {
       },
     ];
 
-    defaults.forEach(dt => {
-      this.demandTypes.set(dt.id, dt);
+    for (const demandType of defaults) {
+      await this.repo.save(demandType);
+    }
+  }
+
+  async findAll(): Promise<DemandType[]> {
+    return this.repo.find({ order: { id: 'ASC' } });
+  }
+
+  async findById(id: string): Promise<DemandType | undefined> {
+    const demandType = await this.repo.findOneBy({ id });
+    return demandType ?? undefined;
+  }
+
+  async create(dto: CreateDemandTypeDto): Promise<DemandType> {
+    const id = randomUUID();
+    return this.repo.save({
+      id,
+      ...dto,
     });
   }
 
-  findAll(): DemandType[] {
-    return Array.from(this.demandTypes.values());
-  }
-
-  findById(id: string): DemandType | undefined {
-    return this.demandTypes.get(id);
-  }
-
-  create(dto: CreateDemandTypeDto): DemandType {
-    const id = randomUUID();
-    const demandType: DemandType = {
-      id,
-      ...dto,
-    };
-    this.demandTypes.set(id, demandType);
-    return demandType;
-  }
-
-  update(id: string, dto: Partial<CreateDemandTypeDto>): DemandType | undefined {
-    const existing = this.demandTypes.get(id);
+  async update(
+    id: string,
+    dto: Partial<CreateDemandTypeDto>,
+  ): Promise<DemandType | undefined> {
+    const existing = await this.repo.findOneBy({ id });
     if (!existing) {
       return undefined;
     }
-    const updated: DemandType = {
+
+    const updated: DemandTypeEntity = {
       ...existing,
       ...dto,
     };
-    this.demandTypes.set(id, updated);
-    return updated;
+
+    return this.repo.save(updated);
   }
 
-  remove(id: string): boolean {
-    return this.demandTypes.delete(id);
+  async remove(id: string): Promise<boolean> {
+    const result = await this.repo.delete(id);
+    return (result.affected ?? 0) > 0;
   }
 }
