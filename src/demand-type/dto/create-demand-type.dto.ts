@@ -1,5 +1,5 @@
 import { ApiProperty } from '@nestjs/swagger';
-import { IsString } from 'class-validator';
+import { IsInt, IsString, Min } from 'class-validator';
 
 export class CreateDemandTypeDto {
   @ApiProperty({
@@ -29,4 +29,15 @@ export class CreateDemandTypeDto {
   })
   @IsString()
   allocationTemplate!: string;
+
+  @ApiProperty({
+    example: 1,
+    description:
+      'Allocation priority (lower = higher priority). ' +
+      'D2C orders at priority 1 are allocated before Wholesale at priority 3. ' +
+      'Used by the engine to rank orders across demand types.',
+  })
+  @IsInt()
+  @Min(0)
+  priority!: number;
 }

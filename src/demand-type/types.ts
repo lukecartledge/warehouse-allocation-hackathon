@@ -4,4 +4,5 @@ export interface DemandType {
   channel: string;
   orderType: string;
   allocationTemplate: string;
+  priority: number;
 }

@@ -309,16 +309,14 @@ export class AllocationEngineService {
   ): Map<string, number> {
     const demandTypePriorityByOrderDemandType = new Map<string, number>();
 
-    for (let index = 0; index < demandTypes.length; index += 1) {
-      const demandType = demandTypes[index];
-      const priority = index + 1;
+    for (const demandType of demandTypes) {
       demandTypePriorityByOrderDemandType.set(
         demandType.channel.toUpperCase(),
-        priority,
+        demandType.priority,
       );
       demandTypePriorityByOrderDemandType.set(
         demandType.displayName.toUpperCase(),
-        priority,
+        demandType.priority,
       );
     }
 

@@ -25,25 +25,28 @@ export class DemandTypeService {
 
     const defaults: DemandType[] = [
       {
-        id: 'dt-1-retail',
-        displayName: 'Retail',
-        channel: 'Retail',
-        orderType: 'Standard Ship',
-        allocationTemplate: 'tpl-retail',
-      },
-      {
-        id: 'dt-2-wholesale',
-        displayName: 'Wholesale',
-        channel: 'Wholesale',
-        orderType: 'Standard Ship',
-        allocationTemplate: 'tpl-wholesale',
-      },
-      {
-        id: 'dt-3-d2c',
+        id: 'dt-1-d2c',
         displayName: 'D2C',
         channel: 'D2C',
         orderType: 'Express',
         allocationTemplate: 'tpl-d2c',
+        priority: 1,
+      },
+      {
+        id: 'dt-2-retail',
+        displayName: 'Retail',
+        channel: 'Retail',
+        orderType: 'Standard Ship',
+        allocationTemplate: 'tpl-retail',
+        priority: 2,
+      },
+      {
+        id: 'dt-3-wholesale',
+        displayName: 'Wholesale',
+        channel: 'Wholesale',
+        orderType: 'Standard Ship',
+        allocationTemplate: 'tpl-wholesale',
+        priority: 3,
       },
       {
         id: 'dt-4-marketplace',
@@ -51,6 +54,7 @@ export class DemandTypeService {
         channel: 'Marketplace',
         orderType: 'Standard Ship',
         allocationTemplate: 'tpl-retail',
+        priority: 4,
       },
     ];
 
@@ -60,7 +64,7 @@ export class DemandTypeService {
   }
 
   async findAll(): Promise<DemandType[]> {
-    return this.repo.find({ order: { id: 'ASC' } });
+    return this.repo.find({ order: { priority: 'ASC' } });
   }
 
   async findById(id: string): Promise<DemandType | undefined> {

@@ -16,4 +16,7 @@ export class DemandTypeEntity {
 
   @Column()
   allocationTemplate!: string;
+
+  @Column({ type: 'integer', default: 0 })
+  priority!: number;
 }
