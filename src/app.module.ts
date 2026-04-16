@@ -1,9 +1,10 @@
 import { Module } from '@nestjs/common';
 import { AppController } from './app.controller';
 import { AppService } from './app.service';
+import { RankingTemplateModule } from './ranking-template/ranking-template.module.js';
 
 @Module({
-  imports: [],
+  imports: [RankingTemplateModule],
   controllers: [AppController],
   providers: [AppService],
 })
