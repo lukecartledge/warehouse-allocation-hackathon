@@ -9,6 +9,9 @@ import type {
   RankingDimension,
 } from '../allocation-template/types.js';
 import { AllocationTemplateService } from '../allocation-template/allocation-template.service.js';
+import { DemandTypeService } from '../demand-type/demand-type.service.js';
+import type { DemandType } from '../demand-type/types.js';
+import { SupplyService } from '../supply/supply.service.js';
 
 const CUSTOMER_TIER_RANK: Record<string, number> = {
   VIP: 1,
@@ -20,18 +23,6 @@ const SHIPPING_METHOD_RANK: Record<string, number> = {
   EXPRESS: 1,
   STANDARD: 2,
   GROUND: 3,
-};
-
-const DEMAND_TYPE_PRIORITY: Record<string, number> = {
-  RETAIL: 1,
-  WHOLESALE: 2,
-  D2C: 3,
-};
-
-const DEMAND_TYPE_TEMPLATE_ID: Record<string, string> = {
-  RETAIL: 'tpl-retail',
-  WHOLESALE: 'tpl-wholesale',
-  D2C: 'tpl-d2c',
 };
 
 const ATS_KEY_SEPARATOR = '::';
@@ -48,6 +39,8 @@ const FALLBACK_LEVELS: RankingDimension[] = [
 export class AllocationEngineService {
   constructor(
     private readonly allocationTemplateService: AllocationTemplateService,
+    private readonly demandTypeService: DemandTypeService,
+    private readonly supplyService: SupplyService,
   ) {}
 
   allocate(
@@ -56,13 +49,25 @@ export class AllocationEngineService {
   ): AllocationResultDto[] {
     const atsByPoolKey = this.buildAtsLookup(inventory);
     const ordersByPoolKey = this.groupOrdersByPoolKey(orders);
-    const templatesByDemandType = this.buildDemandTypeTemplateLookup(orders);
+    const demandTypes = this.demandTypeService.findAll();
+    const demandTypePriorityByOrderDemandType =
+      this.buildDemandTypePriorityLookup(demandTypes);
+    const templatesByDemandType = this.buildDemandTypeTemplateLookup(
+      orders,
+      demandTypes,
+    );
+    const source = this.supplyService.getConfig().sequence[0]?.name ?? 'Unknown';
 
     const results: AllocationResultDto[] = [];
 
     for (const [poolKey, groupedOrders] of ordersByPoolKey) {
       const rankedOrders = [...groupedOrders].sort((left, right) =>
-        this.compareOrders(left, right, templatesByDemandType),
+        this.compareOrders(
+          left,
+          right,
+          templatesByDemandType,
+          demandTypePriorityByOrderDemandType,
+        ),
       );
 
       for (let index = 0; index < rankedOrders.length; index += 1) {
@@ -96,7 +101,7 @@ export class AllocationEngineService {
           requestedQty: order.quantityRequested,
           allocatedQty,
           status,
-          source: 'On-hand',
+          source,
           reason: this.buildReasonCode({
             status,
             order,
@@ -158,6 +163,7 @@ export class AllocationEngineService {
 
   private buildDemandTypeTemplateLookup(
     orders: OrderDto[],
+    demandTypes: DemandType[],
   ): Map<string, AllocationTemplate | undefined> {
     const templatesByDemandType = new Map<
       string,
@@ -166,11 +172,18 @@ export class AllocationEngineService {
 
     for (const order of orders) {
       if (!templatesByDemandType.has(order.demandType)) {
+        const matchingDemandType = demandTypes.find(
+          (demandType) =>
+            demandType.displayName.toUpperCase() === order.demandType,
+        );
+
         templatesByDemandType.set(
           order.demandType,
-          this.allocationTemplateService.findById(
-            DEMAND_TYPE_TEMPLATE_ID[order.demandType],
-          ),
+          matchingDemandType
+            ? this.allocationTemplateService.findById(
+                matchingDemandType.allocationTemplate,
+              )
+            : undefined,
         );
       }
     }
@@ -182,11 +195,18 @@ export class AllocationEngineService {
     left: OrderDto,
     right: OrderDto,
     templatesByDemandType: Map<string, AllocationTemplate | undefined>,
+    demandTypePriorityByOrderDemandType: Map<string, number>,
   ): number {
     if (left.demandType !== right.demandType) {
       const demandPriorityComparison =
-        this.getDemandTypePriority(left.demandType) -
-        this.getDemandTypePriority(right.demandType);
+        this.getDemandTypePriority(
+          left.demandType,
+          demandTypePriorityByOrderDemandType,
+        ) -
+        this.getDemandTypePriority(
+          right.demandType,
+          demandTypePriorityByOrderDemandType,
+        );
 
       if (demandPriorityComparison !== 0) {
         return demandPriorityComparison;
@@ -284,8 +304,35 @@ export class AllocationEngineService {
     }
   }
 
-  private getDemandTypePriority(demandType: string): number {
-    return DEMAND_TYPE_PRIORITY[demandType] ?? Number.MAX_SAFE_INTEGER;
+  private buildDemandTypePriorityLookup(
+    demandTypes: DemandType[],
+  ): Map<string, number> {
+    const demandTypePriorityByOrderDemandType = new Map<string, number>();
+
+    for (let index = 0; index < demandTypes.length; index += 1) {
+      const demandType = demandTypes[index];
+      const priority = index + 1;
+      demandTypePriorityByOrderDemandType.set(
+        demandType.channel.toUpperCase(),
+        priority,
+      );
+      demandTypePriorityByOrderDemandType.set(
+        demandType.displayName.toUpperCase(),
+        priority,
+      );
+    }
+
+    return demandTypePriorityByOrderDemandType;
+  }
+
+  private getDemandTypePriority(
+    demandType: string,
+    demandTypePriorityByOrderDemandType: Map<string, number>,
+  ): number {
+    return (
+      demandTypePriorityByOrderDemandType.get(demandType) ??
+      Number.MAX_SAFE_INTEGER
+    );
   }
 
   private getSortedLevels(

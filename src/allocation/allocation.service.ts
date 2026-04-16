@@ -1,5 +1,6 @@
 import { Injectable } from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
+import { SupplyService } from '../supply/supply.service.js';
 import { AllocationEngineService } from './allocation-engine.service.js';
 import { demoInventory, demoOrders } from './demo.fixture.js';
 import {
@@ -18,7 +19,10 @@ export class AllocationService {
   private results: AllocationResultDto[] = [];
   private lastRunId: string | null = null;
 
-  constructor(private readonly engine: AllocationEngineService) {}
+  constructor(
+    private readonly engine: AllocationEngineService,
+    private readonly supplyService: SupplyService,
+  ) {}
 
   setOrders(orders: OrderDto[]): void {
     this.orders = [...orders];
@@ -33,6 +37,10 @@ export class AllocationService {
   }
 
   run(request: AllocateRequestDto): AllocateResponseDto {
+    if (request.strategyPreset) {
+      this.supplyService.setPreset(request.strategyPreset);
+    }
+
     const filteredOrders = this.filterOrders(request);
     const inventory = this.buildInventoryWithOverrides(request.supplyOverrides);
     const results = this.engine.allocate(filteredOrders, inventory);
