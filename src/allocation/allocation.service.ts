@@ -40,6 +40,16 @@ export class AllocationService {
     await this.inventoryRepo.save(inventory);
   }
 
+  async getInventory(): Promise<InventoryPoolDto[]> {
+    const pools = await this.inventoryRepo.find();
+    return pools.map(pool => ({
+      skuId: pool.skuId,
+      warehouseId: pool.warehouseId,
+      availableToSell: pool.availableToSell,
+      source: pool.source,
+    }));
+  }
+
   async getResults(): Promise<AllocationResultDto[]> {
     const results = await this.resultRepo.find();
     return results.map(result => this.toResultDto(result));

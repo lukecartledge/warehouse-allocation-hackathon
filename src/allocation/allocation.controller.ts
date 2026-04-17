@@ -44,6 +44,16 @@ export class AllocationController {
     return this.allocationService.run(request);
   }
 
+  @Get('inventory')
+  @ApiOperation({
+    summary: 'Get current inventory pools',
+    description: 'Returns all inventory pools with their available-to-sell quantities, grouped by SKU and source.',
+  })
+  @ApiOkResponse({ description: 'List of inventory pools.' })
+  getInventory() {
+    return this.allocationService.getInventory();
+  }
+
   @Get()
   @ApiOperation({
     summary: 'Get allocation results',
