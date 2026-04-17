@@ -164,15 +164,35 @@ export class AllocationService {
       return [...inventory];
     }
 
+    // Calculate the original total ATS per SKU so we can distribute
+    // the override proportionally across pools (On-hand, Transfer, etc.)
+    const originalTotalBySku = new Map<string, number>();
+    for (const pool of inventory) {
+      const current = originalTotalBySku.get(pool.skuId) ?? 0;
+      originalTotalBySku.set(pool.skuId, current + pool.availableToSell);
+    }
+
     return inventory.map((pool) => {
       const override = overrides[pool.skuId];
       if (override === undefined) {
         return { ...pool };
       }
 
+      const totalOverride = Math.max(0, Math.floor(override));
+      const originalTotal = originalTotalBySku.get(pool.skuId) ?? 0;
+
+      // Distribute proportionally; if original total is 0, split evenly
+      const poolCount = inventory.filter(
+        (p) => p.skuId === pool.skuId,
+      ).length;
+      const proportion =
+        originalTotal > 0
+          ? pool.availableToSell / originalTotal
+          : 1 / poolCount;
+
       return {
         ...pool,
-        availableToSell: Math.max(0, Math.floor(override)),
+        availableToSell: Math.floor(totalOverride * proportion),
       };
     });
   }
